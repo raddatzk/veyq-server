@@ -1,4 +1,4 @@
-# A release of veyq-server, started by hand on main: the manifest veyqctl verifies before Copier reads this template
+# A release of veyq-server, started by hand on main (gh workflow run release.yml): the manifest veyqctl verifies before Copier reads this template
 # (veyq ADR 0126 decision 6) — the release, the commit and the sha256 of its tree (scripts/tree_hash.py) — signed
 # keylessly by this workflow, and an immutable GitHub Release carrying both. veyqctl accepts exactly this identity:
 # release.yml of raddatzk/veyq-server on main.
