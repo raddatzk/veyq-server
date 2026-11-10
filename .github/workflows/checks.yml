@@ -1,6 +1,6 @@
 # Render the template with sample answers and check what it renders: scripts/check_template.py, on every push and
 # pull request. No server and no cluster: the template's Ansible is syntax-checked and linted, its Kubernetes YAML built
-# with kustomize and its charts rendered with helm.
+# with kustomize and its charts rendered with helm. Release: release.yml, by hand on main.
 name: Checks
 
 on:
