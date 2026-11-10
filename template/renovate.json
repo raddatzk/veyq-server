@@ -1,0 +1,184 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Dependency updates for this server. A merge to its branch deploys live through Argo CD and there is no",
+    "test cluster: Renovate only opens PRs, never merges. Runs are timed by .github/workflows/renovate.yml (weekly",
+    "and on demand), so no schedule here. Every pin carries its version in a `# renovate:` comment beside the digest",
+    "or commit, so version and digest change together in one PR."
+  ],
+  "extends": [
+    "config:recommended"
+  ],
+  "timezone": "Europe/Berlin",
+  "automerge": false,
+  "platformAutomerge": false,
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "labels": [
+    "dependencies"
+  ],
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 10,
+  "rebaseWhen": "conflicted",
+  "internalChecksFilter": "none",
+  "prCreation": "not-pending",
+  "prNotPendingHours": 80,
+  "internalChecksAsSuccess": true,
+  "ignorePaths": [
+    "secret-templates/**",
+    ".render/**",
+    "ansible/collections/**"
+  ],
+  "customManagers": [
+    {
+      "description": "A `# renovate: … version=<v>` comment, the digest or commit on the next line (OCI chart targetRevisions, cert-manager image digests, the gateway-api commit, Argo CD's install.yaml URL).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^gitops/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s+version=(?<currentValue>\\S+)\\s*\\n[^\\n]*?(?<currentDigest>sha256:[0-9a-f]{64}|\\b[0-9a-f]{40}\\b)"
+      ]
+    },
+    {
+      "description": "A `# renovate:` comment, then `tag: <v>` and `digest: <d>` on the next two lines (veyq's three images).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^gitops/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n\\s*tag:\\s*\"?(?<currentValue>[^\"\\s@]+)\"?\\s*\\n\\s*digest:\\s*\"?(?<currentDigest>sha256:[0-9a-f]{64})"
+      ]
+    },
+    {
+      "description": "A `# renovate:` comment, then `<v>@<digest>` on the next line (Traefik's image tag, veyq-admin in the override). The workflow's renovate-image needs none: the github-actions manager reads it.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^gitops/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n[^\\n]*?[:\\s\"](?<currentValue>[\\w.+-]+)@(?<currentDigest>sha256:[0-9a-f]{64})"
+      ]
+    },
+    {
+      "description": "A `# renovate:` comment, then `<name>_version: <v>` (k3s in the inventory) or `version: <v>` (the k3s Plan).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^ansible/inventory/.+\\.ya?ml$/",
+        "/^gitops/apps/system-upgrade/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+versioning=(?<versioning>\\S+))?\\s*\\n\\s*(?:[a-z0-9_]+_)?version:\\s*(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "description": "A `# renovate:` comment, then a GitHub release-asset URL with its tag (the system-upgrade-controller manifests).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^gitops/.+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>github-releases)\\s+depName=(?<depName>\\S+)\\s*\\n[^\\n]*/releases/download/(?<currentValue>[^/\\s]+)/"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Fresh upstream releases wait three days (Argo CD 3.6.0 needed a 3.6.1 the next day). The wait is a status check on the branch, never a filter (internalChecksFilter none): a group always carries ALL its updates, so Argo CD's install.yaml (github-tags, waits) and its image (docker) cannot land apart. The PR opens once the check passes (prCreation not-pending; prNotPendingHours above the three days). This repository has no CI, so Renovate's own stability check is the only status: internalChecksAsSuccess makes its success count (otherwise a branch with only renovate/ checks stays 'pending' until prNotPendingHours).",
+      "matchDatasources": [
+        "github-releases",
+        "github-tags",
+        "galaxy-collection"
+      ],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "One PR per app.",
+      "matchFileNames": [
+        "gitops/apps/argocd/**"
+      ],
+      "groupName": "Argo CD",
+      "prBodyNotes": [
+        "install.yaml (by commit) and Argo CD's own image move together in this PR. redis follows install.yaml by itself; dex is removed (remove-dex.yaml)."
+      ]
+    },
+    {
+      "matchFileNames": [
+        "gitops/apps/gateway-api/**"
+      ],
+      "groupName": "Gateway API CRDs",
+      "prBodyNotes": [
+        "Check that Traefik and cert-manager support this Gateway API version before merging (their go.mod)."
+      ]
+    },
+    {
+      "matchFileNames": [
+        "gitops/apps/cert-manager/**"
+      ],
+      "groupName": "cert-manager",
+      "prBodyNotes": [
+        "Chart and all four images must name the same cert-manager version."
+      ]
+    },
+    {
+      "matchFileNames": [
+        "gitops/apps/traefik/**"
+      ],
+      "groupName": "Traefik",
+      "prBodyNotes": [
+        "The image tag in values.yaml must equal the new chart's appVersion; change it by hand if Renovate moved them apart."
+      ]
+    },
+    {
+      "description": "veyq: its pins are veyqctl's alone (veyq ADR 0126) — .github/workflows/veyq-upgrade.yml proposes each upgrade as a PR after verifying the release's manifest, images and chart under veyq's release identity and its major entry, none of which Renovate checks. A second mover on the same lines would be drift to veyqctl.",
+      "matchFileNames": [
+        "gitops/apps/veyq/**"
+      ],
+      "enabled": false
+    },
+    {
+      "matchFileNames": [
+        "gitops/apps/system-upgrade/**"
+      ],
+      "groupName": "system-upgrade-controller",
+      "prBodyNotes": [
+        "The controller's manifests, its image and its kubectl image. The k3s version in plan.yaml has its own PR."
+      ]
+    },
+    {
+      "description": "k3s versions are v<semver>+k3s<n>; release candidates (-rcN) are prereleases. After raising k3s_version, Renovate runs the checksum script (allowed by name in the workflow's RENOVATE_ALLOWED_COMMANDS) and commits its result in the same PR.",
+      "matchPackageNames": [
+        "k3s-io/k3s"
+      ],
+      "versioning": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)(?:-rc(?<prerelease>\\d+))?\\+k3s(?<build>\\d+)$",
+      "groupName": "k3s",
+      "prBodyNotes": [
+        "Raises k3s in the Plan (gitops/apps/system-upgrade/install/plan.yaml) and in the inventory (what a fresh server is installed with); k3s_checksums were written by scripts/update-k3s-checksums.sh. Merging it makes the system-upgrade-controller upgrade k3s on the server: a short outage of everything."
+      ],
+      "postUpgradeTasks": {
+        "commands": [
+          "bash scripts/update-k3s-checksums.sh"
+        ],
+        "fileFilters": [
+          "ansible/inventory/group_vars/server/main.yml"
+        ],
+        "executionMode": "update"
+      }
+    },
+    {
+      "matchManagers": [
+        "ansible-galaxy"
+      ],
+      "groupName": "Ansible collections",
+      "prBodyNotes": [
+        "After merging: `cd ansible && ansible-galaxy collection install -r requirements.yml -p collections --force`."
+      ]
+    },
+    {
+      "matchFileNames": [
+        ".github/workflows/**"
+      ],
+      "groupName": "Renovate"
+    }
+  ]
+}

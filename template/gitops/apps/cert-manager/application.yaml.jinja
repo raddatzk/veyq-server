@@ -1,0 +1,34 @@
+# cert-manager — certificates for veyq's Gateway and tenant ListenerSets over ACME HTTP-01.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: [[ project ]]
+  sources:
+    # v1.21.3 by digest (resolved 2026-11-05): veyq's ACME opt-in needs 1.21 or later (the parent-ref fallback);
+    # 1.21.3 is that line's latest patch.
+    - repoURL: oci://quay.io/jetstack/charts/cert-manager
+      # renovate: datasource=docker depName=quay.io/jetstack/charts/cert-manager version=v1.21.3
+      targetRevision: sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240
+      path: .
+      helm:
+        releaseName: cert-manager
+        valueFiles:
+          - $values/gitops/apps/cert-manager/values.yaml
+    - repoURL: [[ repo_url ]]
+      targetRevision: [[ branch ]]
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

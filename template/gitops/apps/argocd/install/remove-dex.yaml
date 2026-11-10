@@ -1,0 +1,39 @@
+# No dex: it only serves single sign-on (GitHub/OIDC login into Argo CD), and the owner logs in as `admin` through
+# the ssh tunnel (README § Reaching the cluster and Argo CD). Removing it is upstream's documented way to disable
+# it. To bring SSO back, drop this file from
+# kustomization.yaml and configure dex.config in argocd-cm.
+$patch: delete
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-dex-server
+---
+$patch: delete
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argocd-dex-server
+---
+$patch: delete
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-dex-server
+---
+$patch: delete
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-dex-server
+---
+$patch: delete
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-dex-server
+---
+$patch: delete
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: argocd-dex-server-network-policy

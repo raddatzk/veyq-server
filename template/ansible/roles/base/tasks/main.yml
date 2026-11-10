@@ -1,0 +1,30 @@
+- name: Install the base packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - nftables
+      - openssl
+      # The clock matters: TLS, ACME and veyq's client-port evidence all lean on it.
+      - systemd-timesyncd
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Read the time zone
+  ansible.builtin.command: timedatectl show --property=Timezone --value
+  register: base_timezone_current
+  changed_when: false
+  check_mode: false
+
+- name: Set the time zone
+  ansible.builtin.command:
+    argv: [timedatectl, set-timezone, "{{ base_timezone }}"]
+  when: base_timezone_current.stdout != base_timezone
+  changed_when: true
+
+- name: Keep the clock synchronised
+  ansible.builtin.systemd_service:
+    name: systemd-timesyncd
+    enabled: true
+    state: started

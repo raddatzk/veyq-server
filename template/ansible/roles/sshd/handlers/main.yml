@@ -1,0 +1,5 @@
+# A reload keeps established sessions (Ansible's own included); new logins get the new rules.
+- name: Reload sshd
+  ansible.builtin.systemd_service:
+    name: ssh
+    state: reloaded

@@ -1,0 +1,4 @@
+# The server's SSH host key, pinned: `veyqctl init` puts exactly this key into ~/.ssh/known_hosts before Ansible connects.
+# `veyqctl init` fills it once you confirmed its fingerprint; by hand:  ssh-keyscan -t ed25519 <server> 2>/dev/null | grep -v '^#'
+# and compare the fingerprint (ssh-keygen -lf ansible/known_hosts) with your provider's console. A rebuilt server
+# has a new key and needs a new line here.

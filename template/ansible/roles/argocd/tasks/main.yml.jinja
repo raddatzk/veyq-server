@@ -1,0 +1,81 @@
+# Argo CD from gitops/apps/argocd/install (the same kustomization Argo CD then manages itself), plus the three
+# things Git cannot hold: the age private key KSOPS decrypts with, the deploy key for this private repository,
+# and the root Application that starts the app of apps. The two Secrets come from the owner's keys on the Mac; no
+# copy of them is left on the server outside the cluster.
+
+# --- Manifests onto the server -------------------------------------------------------------------------------
+- name: Create the bootstrap directory
+  ansible.builtin.file:
+    path: "{{ argocd_bootstrap_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Copy the Argo CD install kustomization, the project and the root Application
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ argocd_bootstrap_dir }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0600"
+    directory_mode: "0700"
+  loop:
+    - { src: "{{ argocd_repo_root }}/gitops/apps/argocd/install/", dest: install/ }
+    - { src: "{{ argocd_repo_root }}/gitops/apps/project.yaml", dest: project.yaml }
+    - { src: "{{ argocd_repo_root }}/gitops/root.yaml", dest: root.yaml }
+
+# --- Namespace and the two Secrets Git does not hold ---------------------------------------------------------
+- name: Create the argocd namespace
+  ansible.builtin.include_tasks: apply.yml
+  vars:
+    argocd_apply_name: namespace argocd
+    argocd_apply_args: [-f, "{{ argocd_bootstrap_dir }}/install/namespace.yaml"]
+
+- name: Read the cluster Secrets from the owner's keys
+  ansible.builtin.include_tasks: secrets.yml
+
+- name: Apply the cluster Secrets
+  ansible.builtin.include_tasks: apply.yml
+  vars:
+    argocd_apply_name: "secret argocd/{{ argocd_secret.metadata.name }}"
+    argocd_apply_secret: true
+    argocd_apply_args: [-f, "-"]
+    argocd_apply_stdin: "{{ argocd_secret | to_nice_yaml }}"
+  loop: "{{ argocd_cluster_secrets }}"
+  loop_control:
+    loop_var: argocd_secret
+    label: "{{ argocd_secret.metadata.name }}"
+
+# --- Argo CD itself --------------------------------------------------------------------------------------------
+- name: Install Argo CD with KSOPS
+  ansible.builtin.include_tasks: apply.yml
+  vars:
+    argocd_apply_name: Argo CD
+    argocd_apply_args: [-k, "{{ argocd_bootstrap_dir }}/install"]
+
+- name: Wait for Argo CD to run
+  ansible.builtin.command:
+    argv: [k3s, kubectl, -n, argocd, rollout, status, "{{ item }}", --timeout=600s]
+  loop:
+    - deployment/argocd-repo-server
+    - deployment/argocd-server
+    - deployment/argocd-redis
+    - statefulset/argocd-application-controller
+  changed_when: false
+  check_mode: false
+
+# --- The app of apps -------------------------------------------------------------------------------------------
+- name: Create the AppProject
+  ansible.builtin.include_tasks: apply.yml
+  vars:
+    argocd_apply_name: AppProject [[ project ]]
+    argocd_apply_args: [-f, "{{ argocd_bootstrap_dir }}/project.yaml"]
+    # The root Application manages it from gitops/apps from then on.
+    argocd_apply_create_only: true
+
+- name: Create the root Application
+  ansible.builtin.include_tasks: apply.yml
+  vars:
+    argocd_apply_name: Application root
+    argocd_apply_args: [-f, "{{ argocd_bootstrap_dir }}/root.yaml"]

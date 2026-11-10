@@ -1,0 +1,49 @@
+# Self-hosted Renovate for this repository only: no third-party app gets read access to it. Renovate opens PRs and
+# never merges them (renovate.json); a merge to master deploys live through Argo CD.
+#
+# The token is the repository secret RENOVATE_TOKEN: a fine-grained personal access token for this
+# repository only (README, "Renovate"). After ticking a box on the Dependency Dashboard, run this workflow by hand
+# (Actions → Renovate → Run workflow) rather than waiting for Monday.
+name: Renovate
+
+on:
+  schedule:
+    # Mondays 05:17 UTC.
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      log-level:
+        description: Renovate log level
+        type: choice
+        options: [info, debug]
+        default: info
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - uses: renovatebot/github-action@1c0cf989c02653fba0efe7ca5772338860ca71dc # v46.3.12
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+          # Version and digest together; Renovate's github-actions manager updates both.
+          renovate-image: ghcr.io/renovatebot/renovate:44.221.4@sha256:daf2956fdac111ff6bb36e093f42b0b28ce4d3503fa0cb267661216782b47859
+        env:
+          LOG_LEVEL: ${{ inputs.log-level || 'info' }}
+          RENOVATE_PLATFORM: github
+          # This repository, whatever it is called (the template carries no name).
+          RENOVATE_REPOSITORIES: '["${{ github.repository }}"]'
+          # The repository already has its renovate.json: no onboarding PR, and no run without it.
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_REQUIRE_CONFIG: required
+          # The only command a post-upgrade task may run: the k3s checksum script (renovate.json, rule "k3s").
+          RENOVATE_ALLOWED_COMMANDS: '["^bash scripts/update-k3s-checksums\\.sh$"]'
+          # GitHub datasources (k3s releases, gateway-api and argo-cd tags) read public repositories with it.
+          RENOVATE_GITHUB_COM_TOKEN: ${{ secrets.RENOVATE_TOKEN }}

@@ -1,0 +1,53 @@
+# Traefik chart 42.3.0 values.
+image:
+  # v3.7.17 by digest (resolved 2026-11-05), in the chart's `<version>@<digest>` form: the digest is what Kubernetes
+  # pulls, the version is what the chart's version checks read — and one line Renovate updates as a pair. Keep it
+  # equal to the chart's appVersion (application.yaml).
+  # renovate: datasource=docker depName=docker.io/library/traefik
+  tag: v3.7.17@sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
+
+providers:
+  kubernetesGateway:
+    enabled: true
+  # Nothing here uses Ingress objects.
+  kubernetesIngress:
+    enabled: false
+
+# veyq brings its own Gateway; Traefik only provides the class.
+gateway:
+  enabled: false
+gatewayClass:
+  enabled: true
+  name: traefik
+
+# Traefik matches a Gateway listener to the entrypoint with the same CONTAINER port, and veyq's Gateway listens on
+# 80 and 443. So the entrypoints listen on 80/443 inside the pod, which an unprivileged process may do once the
+# pod's unprivileged-port floor is 0 (a namespaced, "safe" sysctl; no capability needed).
+ports:
+  web:
+    port: 80
+    exposedPort: 80
+  websecure:
+    port: 443
+    exposedPort: 443
+podSecurityContext:
+  runAsGroup: 65532
+  runAsNonRoot: true
+  runAsUser: 65532
+  seccompProfile:
+    type: RuntimeDefault
+  sysctls:
+    - name: net.ipv4.ip_unprivileged_port_start
+      value: "0"
+
+service:
+  spec:
+    type: LoadBalancer
+    # k3s's ServiceLB answers on the node's ports 80/443. Local keeps the client's source address, which veyq's
+    # rate limits key on (veyq networking docs: "Keep the client's address up to the gateway").
+    externalTrafficPolicy: Local
+
+# No access log: it would record every client address and URL (veyq keeps its own store's request log off for
+# the same reason). Raise it only to troubleshoot.
+accessLog:
+  enabled: false

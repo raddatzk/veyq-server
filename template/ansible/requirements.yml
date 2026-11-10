@@ -1,0 +1,8 @@
+# Installed with: ansible-galaxy collection install -r requirements.yml (into ./collections, see ansible.cfg).
+collections:
+  # Decrypts group_vars/*/*.sops.yaml with the same age key KSOPS uses in the cluster.
+  - name: community.sops
+    version: 2.5.0
+  # ansible.posix.authorized_key and sysctl.
+  - name: ansible.posix
+    version: 2.2.2

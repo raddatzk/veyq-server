@@ -1,0 +1,39 @@
+#!/usr/sbin/nft -f
+# Managed by Ansible (veyq-server, role firewall).
+#
+# NEVER `flush ruleset` in this file (Debian's default does): k3s keeps its own tables in the same nftables
+# (kube-proxy, flannel, the network-policy controller), and a flush would cut every pod off until k3s restarts.
+# This file owns one table and replaces only that one.
+#
+# The chain hooks PREROUTING, before k3s's DNAT, so it filters traffic to the host AND traffic that kube-proxy
+# would forward into the cluster (NodePorts, the LoadBalancer ports). Only the public interface is filtered; pod
+# and loopback traffic is k3s's business.
+table inet veyq_server
+delete table inet veyq_server
+
+table inet veyq_server {
+  set public_tcp_ports {
+    type inet_service
+    elements = { {{ firewall_public_tcp_ports | join(', ') }} }
+  }
+
+  chain public_ingress {
+    type filter hook prerouting priority -150; policy accept;
+
+    iifname != "{{ firewall_public_interface }}" accept
+    ct state established,related accept
+    ct state invalid drop
+
+    # ICMP and ICMPv6 (path MTU discovery, IPv6 neighbour discovery and router advertisements).
+    meta l4proto { icmp, ipv6-icmp } accept
+    # DHCP replies: cloud Debian images commonly run dhcpcd for IPv4 AND IPv6 (port 546 seen listening on
+    # 2026-11-05). A reply to a multicast solicit matches no conntrack entry, so both are allowed explicitly; dropping
+    # them would lose the address at the next renewal.
+    udp sport 67 udp dport 68 accept
+    ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+
+    tcp dport @public_tcp_ports ct state new accept
+
+    counter drop
+  }
+}

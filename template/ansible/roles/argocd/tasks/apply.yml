@@ -1,0 +1,30 @@
+# Idempotent server-side apply: diff first, apply only when the diff finds a change.
+# Inputs: argocd_apply_name, argocd_apply_args (list), optional argocd_apply_stdin, argocd_apply_secret, and
+# argocd_apply_create_only — for an object Argo CD takes over after the bootstrap: created when missing, never
+# re-applied (Argo CD's own apply and ours would rewrite each other's last-applied annotation on every run).
+- name: "Check existence of {{ argocd_apply_name }}"
+  ansible.builtin.command:
+    argv: "{{ ['k3s', 'kubectl', 'get', '--ignore-not-found', '-o', 'name'] + argocd_apply_args }}"
+  register: argocd_apply_existing
+  changed_when: false
+  check_mode: false
+  when: argocd_apply_create_only | default(false)
+
+- name: "Diff {{ argocd_apply_name }}"
+  ansible.builtin.command:
+    argv: "{{ ['k3s', 'kubectl', 'diff', '--server-side', '--force-conflicts'] + argocd_apply_args }}"
+    stdin: "{{ argocd_apply_stdin | default(omit) }}"
+  register: argocd_apply_diff
+  changed_when: false
+  failed_when: argocd_apply_diff.rc > 1
+  check_mode: false
+  when: not (argocd_apply_create_only | default(false)) or argocd_apply_existing.stdout | length == 0
+  no_log: "{{ argocd_apply_secret | default(false) }}"
+
+- name: "Apply {{ argocd_apply_name }}"
+  ansible.builtin.command:
+    argv: "{{ ['k3s', 'kubectl', 'apply', '--server-side', '--force-conflicts'] + argocd_apply_args }}"
+    stdin: "{{ argocd_apply_stdin | default(omit) }}"
+  when: argocd_apply_diff.rc is defined and argocd_apply_diff.rc == 1
+  changed_when: true
+  no_log: "{{ argocd_apply_secret | default(false) }}"

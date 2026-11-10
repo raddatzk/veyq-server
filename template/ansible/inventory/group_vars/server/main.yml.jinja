@@ -1,0 +1,47 @@
+# Non-secret settings for the server. Secrets are in secrets.sops.yaml beside this file (SOPS, age).
+
+# --- The admin user (role admin_user) -------------------------------------------------------------------------
+# the one login on the server after bootstrap: SSH key only, sudo with a password (admin_password, SOPS).
+admin_user: [[ admin_user ]]
+# The public key the owner logs in with — the same one that is on root at server creation.
+# the public key you log in with from your Mac, one line (e.g. `cat ~/.ssh/id_ed25519.pub`).
+admin_ssh_public_key: [[ admin_ssh_public_key ]]
+# sudo asks for admin_password; Ansible answers it from the SOPS file.
+ansible_become_password: "{{ admin_password }}"
+
+# --- Base system (role base) ----------------------------------------------------------------------------------
+base_timezone: Etc/UTC
+# unattended-upgrades installs security updates daily. A kernel update only takes effect after a reboot; with
+# this on, the server reboots itself at the given time when an update asks for it (a few minutes of downtime,
+# k3s brings every workload back). Off, `/var/run/reboot-required` waits for the owner.
+base_unattended_reboot: true
+base_unattended_reboot_time: "04:30"
+
+# --- Firewall (role firewall) ---------------------------------------------------------------------------------
+# Inbound on the public interface: only these TCP ports. 6443 (Kubernetes API) is deliberately absent; the owner
+# reaches it through an SSH tunnel. A provider firewall in front, if any, allows the same three (README).
+firewall_public_interface: "{{ ansible_facts['default_ipv4']['interface'] }}"
+firewall_public_tcp_ports: [22, 80, 443]
+
+# --- k3s (role k3s) -------------------------------------------------------------------------------------------
+# The version a FRESH server is installed with. After that k3s upgrades itself to the version in
+# gitops/apps/system-upgrade/install/plan.yaml; Renovate keeps both equal.
+# v1.36.6+k3s1: newest patch of the minor BEFORE the k3s stable channel's (v1.37.2, promoted 2026-11-03) — a minor
+# with half a year of patches, inside veyq's floor (>= 1.31) and Argo CD 3.5's tested range.
+# renovate: datasource=github-releases depName=k3s-io/k3s
+k3s_version: v1.36.6+k3s1
+# sha256 of the release binaries, from the release's own sha256sum-<arch>.txt. Pinned here, not fetched at run
+# time, so a release asset swapped later fails the download instead of being installed. Written by
+# scripts/update-k3s-checksums.sh, which Renovate runs in every k3s PR (run it by hand after editing k3s_version).
+k3s_checksums:
+  amd64: 66ceb8e67edfa547195135d74783bfadc2ecc04a91059e90ae5f70a3dbc98c15
+  arm64: 49dcecdb4f64f5e92bdc52d204d407fb39729e492f09074488125ee58b6f2895
+# Copy the cluster-admin kubeconfig to the owner's Mac (server https://127.0.0.1:6443, i.e. through the SSH
+# tunnel). Empty = do not copy; it is always on the server in ~admin/.kube/config.
+k3s_kubeconfig_local_path: ""
+
+# --- Argo CD (role argocd) ------------------------------------------------------------------------------------
+# The repository Argo CD syncs, as the Applications under gitops/ name it; the read-only deploy key for it is
+# argocd_repo_ssh_private_key in secrets.sops.yaml.
+# This repository's SSH URL, here and in gitops/ (Copier's repo_url).
+argocd_repo_url: [[ repo_url ]]

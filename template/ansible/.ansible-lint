@@ -1,0 +1,5 @@
+# Run from this directory: cd ansible && ansible-lint
+profile: production
+exclude_paths:
+  - collections/
+  - inventory/group_vars/server/secrets.sops.yaml

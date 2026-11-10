@@ -1,0 +1,10 @@
+# Host access (optional, on by default): argocd-server on host-only NodePorts, so ONE ssh tunnel reaches Argo CD
+# beside the Kubernetes API (README § Reaching the cluster and Argo CD). On or off by Copier's host_access
+# answer; veyq's own admin NodePort is veyq's half's, which `veyqctl init` writes beside it.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - path: server-nodeport.yaml
+    target:
+      kind: Service
+      name: argocd-server

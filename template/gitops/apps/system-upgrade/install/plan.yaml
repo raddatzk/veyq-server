@@ -1,0 +1,23 @@
+# The k3s version this server runs. The controller compares it with the node and, when they differ, runs Rancher's
+# k3s-upgrade image for that version on the node (privileged): it replaces /usr/local/bin/k3s and restarts k3s.
+# Single node: everything is briefly down. Keep it equal to k3s_version in ansible/inventory/group_vars/server/main.yml
+# (what a rebuilt server is installed with); Renovate moves both in one PR.
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: k3s-server
+  namespace: system-upgrade
+spec:
+  concurrency: 1
+  # Cordoned while it upgrades, no drain: with one node there is nowhere to move the pods to.
+  cordon: true
+  nodeSelector:
+    matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: In
+        values: ["true"]
+  serviceAccountName: system-upgrade
+  upgrade:
+    image: rancher/k3s-upgrade
+  # renovate: datasource=github-releases depName=k3s-io/k3s
+  version: v1.36.6+k3s1

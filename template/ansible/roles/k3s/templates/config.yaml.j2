@@ -1,0 +1,8 @@
+# Managed by Ansible (veyq-server, role k3s). Read by `k3s server` at start.
+node-name: {{ inventory_hostname }}
+write-kubeconfig-mode: "0600"
+# Traefik comes from Argo CD (gitops/apps/traefik) with its Gateway API provider; the bundled one would not.
+disable:
+  - traefik
+# Kubernetes Secrets encrypted at rest in the datastore (the age key KSOPS reads is one of them).
+secrets-encryption: true

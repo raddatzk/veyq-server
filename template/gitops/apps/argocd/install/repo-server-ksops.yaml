@@ -1,0 +1,43 @@
+# KSOPS in the repo server (KSOPS README, "KSOPS Repo Server Patch"), keeping Argo CD's own kustomize: only the
+# ksops binary is added. The age key is the Secret `sops-age` Ansible creates; it is not in Git.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argocd-repo-server
+spec:
+  template:
+    spec:
+      volumes:
+        - name: custom-tools
+          emptyDir: {}
+        - name: sops-age
+          secret:
+            secretName: sops-age
+      initContainers:
+        - name: install-ksops
+          image: viaductoss/ksops
+          command: ["/usr/local/bin/ksops", "install", "/custom-tools"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - mountPath: /custom-tools
+              name: custom-tools
+      containers:
+        - name: argocd-repo-server
+          env:
+            - name: SOPS_AGE_KEY_FILE
+              value: /.config/sops/age/keys.txt
+          volumeMounts:
+            - mountPath: /usr/local/bin/ksops
+              name: custom-tools
+              subPath: ksops
+            - mountPath: /.config/sops/age
+              name: sops-age
+              readOnly: true

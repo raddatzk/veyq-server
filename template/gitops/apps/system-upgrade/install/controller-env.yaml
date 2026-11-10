@@ -1,0 +1,10 @@
+# The kubectl image the upgrade jobs use to cordon and uncordon the node: the release ships v1.30.3, outside
+# kubectl's supported skew to this cluster's 1.36; this one matches it, by digest (resolved 2026-11-06).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: default-controller-env
+  namespace: system-upgrade
+data:
+  # renovate: datasource=docker depName=rancher/kubectl
+  SYSTEM_UPGRADE_JOB_KUBECTL_IMAGE: rancher/kubectl:v1.36.2@sha256:06c7a7a9772737494ae1e0c3af90f1b5385630c147e47c1c7cea92f4bed55fbe

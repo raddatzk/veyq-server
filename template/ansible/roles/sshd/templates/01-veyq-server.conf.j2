@@ -1,0 +1,15 @@
+# Managed by Ansible (veyq-server, role sshd). Named 01-… so it is read before cloud-init's 50-cloud-init.conf:
+# sshd takes the FIRST value it reads for a keyword.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+AllowUsers {{ admin_user }}
+MaxAuthTries 3
+LoginGraceTime 30
+X11Forwarding no
+# Kept on: the owner reaches the Kubernetes API (6443, not public) through an SSH tunnel.
+AllowTcpForwarding local
+AllowAgentForwarding no
+PermitTunnel no

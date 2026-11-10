@@ -1,0 +1,78 @@
+# veyq-server's questions. `veyqctl init` answers them (veyq ADR 0126 decision 6); asked by hand, `copier copy` works
+# too, but secrets, the host key and the deploy key are veyqctl's to make, never Copier answers.
+_subdirectory: template
+_templates_suffix: .jinja
+_answers_file: .copier-answers.yml
+# The rendered files are Ansible and Kubernetes YAML full of `{{ … }}`: Copier's own markers are brackets instead.
+_envops:
+  block_start_string: "[%"
+  block_end_string: "%]"
+  variable_start_string: "[["
+  variable_end_string: "]]"
+  comment_start_string: "[#"
+  comment_end_string: "#]"
+  keep_trailing_newline: true
+
+server_address:
+  type: str
+  help: The server's public DNS name or IPv4 address, as Ansible connects to it
+  validator: >-
+    [% if not (server_address | regex_search('^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$|^(\d{1,3}\.){3}\d{1,3}$')) %]
+    a DNS name or an IPv4 address
+    [% endif %]
+
+node_name:
+  type: str
+  help: The node's name in the inventory and in k3s
+  default: "[[ server_address.split('.')[0] if not (server_address | regex_search('^\\d')) else 'server' ]]"
+  validator: >-
+    [% if not (node_name | regex_search('^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$')) %]
+    lower-case letters, digits and '-'
+    [% endif %]
+
+admin_user:
+  type: str
+  help: The admin user created on the server — your only login after the bootstrap (SSH key, sudo with a password)
+  validator: >-
+    [% if not (admin_user | regex_search('^[a-z_][a-z0-9_-]{0,31}$')) or admin_user in ['root', 'ci'] %]
+    a Linux user name, not root
+    [% endif %]
+
+admin_ssh_public_key:
+  type: str
+  help: The public SSH key that user logs in with, one line
+  validator: >-
+    [% if not (admin_ssh_public_key | regex_search('^(ssh-ed25519|ecdsa-sha2-nistp(256|384|521)|ssh-rsa) [A-Za-z0-9+/]+=*')) %]
+    an OpenSSH public key line
+    [% endif %]
+
+age_recipient:
+  type: str
+  help: The age PUBLIC key every SOPS file of this repository is encrypted to
+  validator: >-
+    [% if not (age_recipient | regex_search('^age1[0-9a-z]{58}$')) %]
+    an age public key (age1…)
+    [% endif %]
+
+repo_url:
+  type: str
+  help: The SSH URL Argo CD reads this repository from
+
+branch:
+  type: str
+  help: The branch Argo CD follows
+  default: main
+
+project:
+  type: str
+  help: The Argo CD project every application of this server joins
+  default: server
+  validator: >-
+    [% if not (project | regex_search('^[a-z0-9]([a-z0-9.-]{0,61}[a-z0-9])?$')) %]
+    lower-case letters, digits, '.' and '-'
+    [% endif %]
+
+host_access:
+  type: bool
+  help: Argo CD on a host-only NodePort, reached through the one ssh tunnel beside the Kubernetes API
+  default: true

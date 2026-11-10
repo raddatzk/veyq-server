@@ -1,0 +1,12 @@
+# SOPS rules for this repository. One age recipient: the owner's key, whose PRIVATE half lives in 1Password
+# only.
+# The recipient is the one `veyqctl init` was given (Copier's age_recipient). Only values are encrypted; keys and
+# structure stay readable for review.
+creation_rules:
+  # Kubernetes Secrets decrypted in the cluster by KSOPS: only data/stringData, so metadata stays diffable.
+  - path_regex: gitops/.*\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: [[ age_recipient ]]
+  # Ansible variables decrypted on the owner's Mac by the community.sops vars plugin: every value.
+  - path_regex: ansible/.*\.sops\.yaml$
+    age: [[ age_recipient ]]

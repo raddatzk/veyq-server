@@ -1,0 +1,25 @@
+# Argo CD manages itself from the same kustomization Ansible bootstrapped it with.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  project: [[ project ]]
+  source:
+    repoURL: [[ repo_url ]]
+    targetRevision: [[ branch ]]
+    path: gitops/apps/argocd/install
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    # No prune: a resource dropped from upstream's install.yaml is removed by hand, never by Argo CD under itself.
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      # install.yaml's CRDs exceed the client-side apply annotation limit.
+      - ServerSideApply=true

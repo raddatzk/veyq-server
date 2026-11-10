@@ -1,0 +1,7 @@
+# The one server. The group name `server` is what group_vars/server/ attaches to; the host name becomes the k3s
+# node name. Committed so CI uses the same inventory as the owner's Mac.
+server:
+  hosts:
+    [[ node_name ]]:
+      # the server's public DNS name (or IPv4).
+      ansible_host: [[ server_address ]]

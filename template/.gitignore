@@ -1,0 +1,20 @@
+# Never commit key material. The age private key lives in 1Password only; these patterns catch the usual
+# accidents (an age key file, a decrypted copy, an SSH key generated next to the repo).
+*.agekey
+# The local copy of the age key `veyqctl init` can make; its only other copy is the owner's password manager.
+.age/
+keys.txt
+*.dec.yaml
+*.decrypted.*
+id_ed25519*
+*.pem
+
+# Ansible collections installed from requirements.yml (pinned there), and run artefacts.
+ansible/collections/
+*.retry
+
+# Local renders and editor/OS noise.
+.render/
+.DS_Store
+.idea/
+.vscode/

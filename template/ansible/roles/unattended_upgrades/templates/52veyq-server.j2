@@ -1,0 +1,6 @@
+// Managed by Ansible (veyq-server, role unattended_upgrades). Debian's 50unattended-upgrades keeps choosing the
+// origins (the security archive); this file only adds the clean-up and reboot policy.
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if base_unattended_reboot else 'false' }}";
+Unattended-Upgrade::Automatic-Reboot-Time "{{ base_unattended_reboot_time }}";

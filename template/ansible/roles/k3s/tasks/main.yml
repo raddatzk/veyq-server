@@ -1,0 +1,123 @@
+# k3s installed from its release binary with a pinned checksum — no `curl | sh`.
+- name: Map the CPU architecture to k3s's asset names
+  ansible.builtin.set_fact:
+    k3s_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
+
+# Installed once, at the version in the inventory. After that the system-upgrade-controller owns the binary
+# (gitops/apps/system-upgrade/install/plan.yaml): replacing it here would undo its upgrades.
+- name: Check for an installed k3s
+  ansible.builtin.stat:
+    path: /usr/local/bin/k3s
+  register: k3s_installed
+
+- name: Download the k3s binary
+  when: not k3s_installed.stat.exists
+  ansible.builtin.get_url:
+    url: >-
+      https://github.com/k3s-io/k3s/releases/download/{{ k3s_version | urlencode }}/k3s{{ '' if k3s_arch == 'amd64' else '-' ~ k3s_arch }}
+    dest: /usr/local/bin/k3s
+    checksum: "sha256:{{ k3s_checksums[k3s_arch] }}"
+    owner: root
+    group: root
+    mode: "0755"
+  notify: Restart k3s
+
+- name: Link kubectl, crictl and ctr to k3s
+  ansible.builtin.file:
+    src: /usr/local/bin/k3s
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+  loop: [kubectl, crictl, ctr]
+
+- name: Create the k3s config directory
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write the k3s config
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    owner: root
+    group: root
+    # World-readable: it holds no secret, and k3s's own kubectl reads it for every user (warning if it cannot).
+    mode: "0644"
+  notify: Restart k3s
+
+- name: Write the k3s unit
+  ansible.builtin.template:
+    src: k3s.service.j2
+    dest: /etc/systemd/system/k3s.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart k3s
+
+- name: Start k3s
+  ansible.builtin.systemd_service:
+    name: k3s
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Apply a pending k3s restart before anything talks to the cluster
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for the node to be Ready
+  ansible.builtin.command:
+    argv: [k3s, kubectl, wait, --for=condition=Ready, "node/{{ inventory_hostname }}", --timeout=300s]
+  register: k3s_node_wait
+  retries: 10
+  delay: 10
+  until: k3s_node_wait.rc == 0
+  changed_when: false
+  check_mode: false
+
+- name: Create the admin user's .kube directory
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/.kube"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0700"
+
+# The server address stays https://127.0.0.1:6443: right on the server; `veyqctl connect` copies it to the operator's machine with
+# the tunnel's local port (README § Reaching the cluster and Argo CD).
+- name: Give the admin user the cluster-admin kubeconfig
+  ansible.builtin.copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "/home/{{ admin_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0600"
+
+# k3s's built-in kubectl reads /etc/rancher/k3s/k3s.yaml (root only) unless KUBECONFIG says otherwise; it does
+# not fall back to ~/.kube/config. First line of .bashrc, before Debian's "not interactive: return".
+- name: Point the admin user's kubectl at that kubeconfig
+  ansible.builtin.lineinfile:
+    path: "/home/{{ admin_user }}/.bashrc"
+    line: export KUBECONFIG="$HOME/.kube/config"
+    insertbefore: BOF
+    create: true
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0644"
+
+- name: Copy the kubeconfig to the owner's Mac
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ k3s_kubeconfig_local_path }}"
+    flat: true
+  when: k3s_kubeconfig_local_path | length > 0
+
+- name: Restrict the local kubeconfig copy to the owner
+  ansible.builtin.file:
+    path: "{{ k3s_kubeconfig_local_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false
+  when: k3s_kubeconfig_local_path | length > 0

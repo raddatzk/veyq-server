@@ -1,0 +1,4 @@
+# The repository root on the controller; the role copies from gitops/ under it.
+argocd_repo_root: "{{ playbook_dir | dirname | dirname }}"
+# Where the bootstrap copies the manifests it applies on the server.
+argocd_bootstrap_dir: /var/lib/veyq-server/bootstrap

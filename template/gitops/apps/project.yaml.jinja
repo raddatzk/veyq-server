@@ -1,0 +1,23 @@
+# One project for the server, limited to the sources this repository names — a new source is a reviewed line here.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: [[ project ]]
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  description: Everything this server runs, from this repository
+  sourceRepos:
+    - [[ repo_url ]]
+    - https://github.com/kubernetes-sigs/gateway-api.git
+    - oci://ghcr.io/traefik/helm/traefik
+    - oci://quay.io/jetstack/charts/cert-manager
+    # veyq's chart: the Application `veyqctl init` writes beside this server's own joins this project.
+    - oci://ghcr.io/raddatzk/charts/veyq
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

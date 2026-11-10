@@ -1,0 +1,54 @@
+# The admin user: the only personal login after bootstrap. SSH key only (sshd role), sudo with a password.
+# The password needs the SOPS secrets, which only the owner's Mac can decrypt: without them (CI) the user and its
+# key are still kept, and the password is left as it is.
+- name: Install sudo and openssl
+  ansible.builtin.apt:
+    name: [sudo, openssl]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create the admin user
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    shell: /bin/bash
+    groups: [sudo]
+    append: true
+  register: admin_user_account
+
+- name: Set the admin password
+  when: admin_password is defined
+  block:
+    - name: Require the admin password and its salt from secrets.sops.yaml
+      ansible.builtin.assert:
+        that:
+          - admin_password | length > 0
+          - admin_password_salt is defined and admin_password_salt is match('^[A-Za-z0-9./]{16}$')
+        fail_msg: admin_password (not empty) and admin_password_salt (16 chars of [A-Za-z0-9./]) must be set in secrets.sops.yaml
+      no_log: true
+
+    # Hashed on the server with a fixed salt, so the hash is stable and the task idempotent; no passlib needed on the
+    # controller (Python 3.13 removed the crypt module).
+    - name: Hash the admin password
+      ansible.builtin.command:
+        argv: [openssl, passwd, -6, -salt, "{{ admin_password_salt }}", -stdin]
+        stdin: "{{ admin_password }}"
+      register: admin_user_password_hash
+      changed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: Store the admin password hash
+      ansible.builtin.user:
+        name: "{{ admin_user }}"
+        password: "{{ admin_user_password_hash.stdout }}"
+        update_password: always
+      no_log: true
+
+# In check mode a user that does not exist yet has no home to look into; the real run creates both.
+- name: Authorize exactly the owner's SSH key for the admin user
+  ansible.posix.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ admin_ssh_public_key }}"
+    exclusive: true
+  when: not (ansible_check_mode and admin_user_account is changed)

@@ -1,0 +1,70 @@
+# A release of veyq-server, started by hand on main: the manifest veyqctl verifies before Copier reads this template
+# (veyq ADR 0126 decision 6) — the release, the commit and the sha256 of its tree (scripts/tree_hash.py) — signed
+# keylessly by this workflow, and an immutable GitHub Release carrying both. veyqctl accepts exactly this identity:
+# release.yml of raddatzk/veyq-server on main.
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write # the tag and the release
+      id-token: write # keyless signing through GitHub's OIDC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v3.1.3
+
+      - name: Name the release
+        id: name
+        run: |
+          set -euo pipefail
+          major=$(tr -d '[:space:]' < VERSION)
+          since=$(git log -1 --format=%H -- VERSION)
+          minor=$(git rev-list --count "${since}..HEAD")
+          release="${major}.${minor}"
+          if git ls-remote --exit-code --tags origin "refs/tags/v${release}" >/dev/null; then
+            echo "::error::v${release} exists; a release is never replaced"; exit 1
+          fi
+          echo "release=${release}" >> "$GITHUB_OUTPUT"
+
+      - name: Write and sign the manifest
+        env:
+          RELEASE: ${{ steps.name.outputs.release }}
+        run: |
+          set -euo pipefail
+          commit=$(git rev-parse HEAD)
+          tree=$(python3 scripts/tree_hash.py "${commit}")
+          python3 - "$RELEASE" "$commit" "$tree" > veyq-server-manifest.json <<'PY'
+          import datetime, json, sys
+          release, commit, tree = sys.argv[1:4]
+          print(json.dumps({"release": release, "commit": commit, "tree_sha256": tree,
+                            "date": datetime.date.today().isoformat()}, indent=2))
+          PY
+          cosign sign-blob --yes --bundle veyq-server-manifest.json.bundle veyq-server-manifest.json
+          cat veyq-server-manifest.json
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ steps.name.outputs.release }}
+        run: |
+          gh release create "v${RELEASE}" --target "$(git rev-parse HEAD)" --title "veyq-server ${RELEASE}" \
+            --notes "Rendered by veyqctl init after verifying veyq-server-manifest.json against its bundle." \
+            veyq-server-manifest.json veyq-server-manifest.json.bundle

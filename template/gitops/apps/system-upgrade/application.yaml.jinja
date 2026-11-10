@@ -1,0 +1,27 @@
+# Rancher's system-upgrade-controller: upgrades k3s from inside the cluster, so the version in Git (plan.yaml) is
+# the version the server runs, with no key to the server outside it. Renovate raises the version; a merge upgrades k3s
+# (a short outage of everything on this single node).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: system-upgrade
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: [[ project ]]
+  source:
+    repoURL: [[ repo_url ]]
+    targetRevision: [[ branch ]]
+    path: gitops/apps/system-upgrade/install
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: system-upgrade
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      # The Plan is a custom resource whose CRD this same app installs.
+      - SkipDryRunOnMissingResource=true

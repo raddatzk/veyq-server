@@ -1,0 +1,35 @@
+# Traefik — the Gateway API implementation serving veyq's Gateway (GatewayClass `traefik`).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: [[ project ]]
+  sources:
+    # Chart 42.3.0 (Traefik v3.7.17) by digest (resolved 2026-11-05): the latest chart with the latest Traefik
+    # release. Traefik 3.8 (ListenerSet support, needed for tenant domains under veyq's per-domain TLS) is
+    # still a release candidate.
+    - repoURL: oci://ghcr.io/traefik/helm/traefik
+      # renovate: datasource=docker depName=ghcr.io/traefik/helm/traefik version=42.3.0
+      targetRevision: sha256:de80db5ff49b72d040904a3e0bc11f631648dc421e2bd0ac5c888990be1400ca
+      path: .
+      helm:
+        releaseName: traefik
+        valueFiles:
+          - $values/gitops/apps/traefik/values.yaml
+    - repoURL: [[ repo_url ]]
+      targetRevision: [[ branch ]]
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

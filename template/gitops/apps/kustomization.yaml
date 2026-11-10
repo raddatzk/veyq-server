@@ -1,0 +1,11 @@
+# Everything the root Application syncs: the project and one Application per app.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - project.yaml
+  - argocd/application.yaml
+  - gateway-api/application.yaml
+  - cert-manager/application.yaml
+  - traefik/application.yaml
+  - system-upgrade/application.yaml
+  # veyq: `veyqctl init` writes gitops/apps/veyq/ and adds its Application here.

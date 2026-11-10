@@ -1,0 +1,17 @@
+# [[ node_name ]] — a server for veyq, as code
+
+This repository is the whole server: Ansible sets up the machine (an admin user, a hardened sshd, a host firewall,
+unattended upgrades, k3s, Argo CD), and Argo CD keeps the cluster in step with `gitops/` (itself, the Gateway API,
+Traefik, cert-manager, the system-upgrade-controller, and veyq once `veyqctl init` has written `gitops/apps/veyq/`).
+
+It was rendered from [veyq-server](https://github.com/raddatzk/veyq-server) by `veyqctl init`, which also generated its
+secrets (SOPS-encrypted to the age key in `.sops.yaml`), pinned the server's host key in `ansible/known_hosts`, ran the
+bootstrap and connected this machine. Run `veyqctl init` again to continue an interrupted setup, `veyqctl connect` after
+a rebuild, `veyqctl upgrade` for veyq; Renovate keeps the server's own pins current.
+
+- `ansible/` — the playbooks `veyqctl` runs (`bootstrap` once per fresh server, `server` after a change here).
+- `gitops/root.yaml` — the root Application; `gitops/apps/<app>/` — one directory per application.
+- `.copier-answers.yml` — the answers this was rendered with; `copier update` brings a later veyq-server release in.
+
+Never commit key material: the age private key lives in your password manager (and, if you let `veyqctl init` make
+one, in the gitignored `.age/key.txt`).

@@ -1,0 +1,21 @@
+# argocd-server on fixed NodePorts, so ONE ssh tunnel reaches it beside the Kubernetes API (README § Reaching the
+# cluster and Argo CD) instead of an ssh tunnel plus a kubectl port-forward. Never public: the host firewall's chain
+# hooks prerouting before k3s's DNAT and admits only 22, 80 and 443 on the public interface, so a NodePort answers
+# only on the host itself — which is where the tunnel ends. Upstream's argocd-server NetworkPolicy admits any source.
+# A JSON patch, by index: a strategic merge of the ports list rendered the type but silently dropped both nodePorts
+# (kustomize, 2026-11-10). Indexes 0/1 are upstream's http/https; the tests pin the names, so a reorder fails loudly.
+- op: test
+  path: /spec/ports/0/name
+  value: http
+- op: test
+  path: /spec/ports/1/name
+  value: https
+- op: replace
+  path: /spec/type
+  value: NodePort
+- op: add
+  path: /spec/ports/0/nodePort
+  value: 30080
+- op: add
+  path: /spec/ports/1/nodePort
+  value: 30443

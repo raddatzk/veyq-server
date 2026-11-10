@@ -1,0 +1,24 @@
+# Once per fresh server, from the owner's Mac:
+#   run by `veyqctl init`, once per fresh server
+# 1. as root (the provider put the owner's key there): the admin user, then a login as that user from this Mac;
+# 2. as the admin user, server.yml: hardening (root and password logins off), firewall, upgrades, k3s, Argo CD with
+#    the age key and the deploy key, the root Application. From then on Argo CD pulls everything from Git, k3s
+#    upgrades itself (gitops/apps/system-upgrade), and the server playbook runs again only for changes under ansible/.
+- name: Create the admin user
+  hosts: server
+  remote_user: root
+  gather_facts: true
+  roles:
+    - role: admin_user
+  tasks:
+    - name: Prove the admin login from this Mac, before server.yml switches root login off
+      ansible.builtin.command:
+        argv: [ssh, -o, BatchMode=yes, -o, ConnectTimeout=15, "{{ admin_user }}@{{ ansible_host }}", "true"]
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      check_mode: false
+      when: not ansible_check_mode  # in check mode the admin user does not exist yet
+
+- name: Everything else
+  ansible.builtin.import_playbook: server.yml

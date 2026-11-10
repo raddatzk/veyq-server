@@ -1,0 +1,36 @@
+# The server itself, as the admin user with sudo; `veyqctl init` runs it once after the bootstrap creates that
+# user, and again after any change under ansible/. Idempotent. Never run from CI: GitHub holds no
+# key to this server (Argo CD pulls from Git instead).
+- name: Check the controller
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require an Ansible that supports Debian 13's Python 3.13
+      ansible.builtin.assert:
+        that: ansible_version.full is version('2.18', '>=')
+        fail_msg: >-
+          ansible-core {{ ansible_version.full }} is too old for Debian 13 (Python 3.13); use 2.18 or later
+          (README, Tools).
+
+- name: Harden the server and install k3s and Argo CD
+  hosts: server
+  remote_user: "{{ admin_user }}"
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Refuse to run as root, so the admin login is proven before root login is switched off
+      ansible.builtin.command: whoami
+      become: false
+      register: server_whoami
+      changed_when: false
+      check_mode: false
+      failed_when: server_whoami.stdout != admin_user
+  roles:
+    - role: base
+    - role: admin_user
+    - role: sshd
+    - role: firewall
+    - role: unattended_upgrades
+    - role: k3s
+    - role: argocd

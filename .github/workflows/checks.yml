@@ -1,0 +1,50 @@
+# Render the template with sample answers and check what it renders: scripts/check_template.py, on every push and
+# pull request. No server and no cluster: the template's Ansible is syntax-checked and linted, its Kubernetes YAML built
+# with kustomize and its charts rendered with helm.
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v4.0.1
+  HELM_SHA256: e0365548f01ed52a58a1181ad310b604a3244f59257425bb1739499372bdff60
+  KUSTOMIZE_VERSION: v5.8.3
+  KUSTOMIZE_SHA256: cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61
+
+jobs:
+  template:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # copier copies from this checkout's git
+
+      - name: Install Helm and kustomize (pinned tarballs)
+        run: |
+          set -euo pipefail
+          helm_tar="helm-${HELM_VERSION}-linux-amd64.tar.gz"
+          curl -fsSLo "${RUNNER_TEMP}/${helm_tar}" "https://get.helm.sh/${helm_tar}"
+          echo "${HELM_SHA256}  ${RUNNER_TEMP}/${helm_tar}" | sha256sum --check --strict -
+          tar -xzf "${RUNNER_TEMP}/${helm_tar}" -C "${RUNNER_TEMP}" linux-amd64/helm
+          k_tar="kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "${RUNNER_TEMP}/${k_tar}" \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/${k_tar}"
+          echo "${KUSTOMIZE_SHA256}  ${RUNNER_TEMP}/${k_tar}" | sha256sum --check --strict -
+          tar -xzf "${RUNNER_TEMP}/${k_tar}" -C "${RUNNER_TEMP}/linux-amd64" kustomize
+          echo "${RUNNER_TEMP}/linux-amd64" >> "$GITHUB_PATH"
+
+      - name: Install copier, yamllint, Ansible and ansible-lint
+        run: |
+          set -euo pipefail
+          python3 -m venv "${RUNNER_TEMP}/venv"
+          "${RUNNER_TEMP}/venv/bin/pip" install --quiet -r requirements-ci.txt
+          echo "${RUNNER_TEMP}/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Render and check
+        run: python3 scripts/check_template.py

@@ -1,0 +1,29 @@
+# Argo CD v3.5.7 — upstream's install.yaml plus KSOPS. Applied once by Ansible (kubectl apply -k), then synced
+# by the Application `argocd` from this same directory.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: argocd
+resources:
+  - namespace.yaml
+  # v3.5.7, by the tag's commit: a moved tag cannot change what is installed. v3.5 and not 3.6: 3.6.0 came out
+  # 2026-11-03 and needed a 3.6.1 the next day; 3.5 is the mature supported minor.
+  # renovate: datasource=github-tags depName=argoproj/argo-cd version=v3.5.7
+  - https://raw.githubusercontent.com/argoproj/argo-cd/6d732962f61a99c2a0f221fd26b9aac7c83bcf18/manifests/install.yaml
+patches:
+  - path: argocd-cm.yaml
+  - path: repo-server-ksops.yaml
+  - path: remove-dex.yaml
+# Optional parts, from Copier's answers (a commented line is off).
+components:
+[% if host_access %]  - host-access[% else %]  # - host-access[% endif %]
+# Argo CD's own image and KSOPS, pinned by digest (resolved 2026-11-05); the tag stays for the reader.
+# `newTag: <tag>@<digest>` is the form Renovate's kustomize manager updates as a pair (it skips newTag beside digest).
+# Argo CD's image moves with install.yaml above, in one Renovate PR. redis is NOT overridden: it is whatever the
+# pinned install.yaml names, so it follows every Argo CD update with no step of its own (tag-pinned through that
+# commit, not digest-pinned).
+images:
+  - name: quay.io/argoproj/argocd
+    newTag: v3.5.7@sha256:16df57da6f223808d204cd94c67c929b931fa01670b91b0b3a2298c4647de0db
+  # KSOPS v4.5.1, the latest release (2026-04-13).
+  - name: viaductoss/ksops
+    newTag: v4.5.1@sha256:4def9fdd4e2f850265740ebe9592c5455d19b76891e88e602df8b52d74b95334
