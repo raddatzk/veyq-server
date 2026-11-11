@@ -10,7 +10,9 @@ For each set of answers below (host access on and off): `copier copy` into a tem
     Gateway API CRDs at the commit the Application pins,
   * `helm template` of every chart an Application pins by digest (cert-manager, Traefik), with its values file,
   * `ansible-playbook --syntax-check` of both playbooks against the rendered inventory, and ansible-lint when present,
-  * Argo CD's NodePorts rendered exactly when host access is on.
+  * Argo CD's NodePorts rendered exactly when host access is on;
+and once, on the template itself: scripts/systems.py reads every role's platforms as a YAML parser does, and finds them
+the same in every role (the release manifest's `systems`).
 Needs copier, yamllint, kustomize, helm and ansible-playbook (with ansible/requirements.yml's collections) on PATH.
 """
 from __future__ import annotations
@@ -103,6 +105,23 @@ def check_repo(repo: Path, host_access: bool) -> None:
         check(f"{tag}: ansible-lint", result.returncode == 0, result.stdout + result.stderr)
 
 
+def check_systems() -> None:
+    """scripts/systems.py — the manifest's `systems` — against a YAML parser's reading of each role's meta/main.yml."""
+    import yaml  # ansible-core's dependency, installed with it (requirements-ci.txt)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import systems
+    for meta in sorted((ROOT / "template/ansible/roles").glob("*/meta/main.yml")):
+        parsed = yaml.safe_load(meta.read_text())["galaxy_info"]["platforms"]
+        check(f"systems.py reads {meta.parent.parent.name}'s platforms as YAML does",
+              systems.platforms(meta.read_text()) == parsed, str(parsed))
+    try:
+        found = systems.systems()
+        check("every role names the same platforms", True)
+        print(f"   systems: {found}")
+    except ValueError as e:
+        check("every role names the same platforms", False, str(e))
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--copier", default=shutil.which("copier") or "copier")
@@ -110,6 +129,7 @@ def main() -> int:
     args = p.parse_args()
     global LINT
     LINT = not args.no_lint
+    check_systems()
     with tempfile.TemporaryDirectory(prefix="veyq-server-check-") as tmp:
         for host_access in (True, False):
             out = Path(tmp) / f"rendered-{host_access}"

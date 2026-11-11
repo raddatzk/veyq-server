@@ -5,8 +5,6 @@
       - curl
       - nftables
       - openssl
-      # The clock matters: TLS, ACME and veyq's client-port evidence all lean on it.
-      - systemd-timesyncd
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -23,8 +21,20 @@
   when: base_timezone_current.stdout != base_timezone
   changed_when: true
 
+# The clock matters: TLS, ACME and veyq's client-port evidence all lean on it. Whichever daemon the system came with
+# keeps it: chrony where it is installed (Ubuntu's default since 25.10) — installing systemd-timesyncd there would make
+# apt remove it — else systemd-timesyncd (Debian's and Ubuntu 24.04's).
+- name: Read the installed packages
+  ansible.builtin.package_facts:
+
+- name: Install systemd-timesyncd where no chrony keeps the clock
+  ansible.builtin.apt:
+    name: systemd-timesyncd
+    state: present
+  when: "'chrony' not in ansible_facts.packages"
+
 - name: Keep the clock synchronised
   ansible.builtin.systemd_service:
-    name: systemd-timesyncd
+    name: "{{ 'chrony' if 'chrony' in ansible_facts.packages else 'systemd-timesyncd' }}"
     enabled: true
     state: started

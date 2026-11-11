@@ -1,5 +1,6 @@
 # A release of veyq-server, started by hand on main (gh workflow run release.yml): the manifest veyqctl verifies before Copier reads this template
-# (veyq ADR 0126 decision 6) — the release, the commit and the sha256 of its tree (scripts/tree_hash.py) — signed
+# (veyq ADR 0126 decision 6) — the release, the commit, the sha256 of its tree (scripts/tree_hash.py) and the systems
+# it sets up (scripts/systems.py, which veyqctl checks the server against) — signed
 # keylessly by this workflow, and an immutable GitHub Release carrying both. veyqctl accepts exactly this identity:
 # release.yml of raddatzk/veyq-server on main.
 name: Release
@@ -51,10 +52,11 @@ jobs:
           set -euo pipefail
           commit=$(git rev-parse HEAD)
           tree=$(python3 scripts/tree_hash.py "${commit}")
-          python3 - "$RELEASE" "$commit" "$tree" > veyq-server-manifest.json <<'PY'
+          systems=$(python3 scripts/systems.py)
+          python3 - "$RELEASE" "$commit" "$tree" "$systems" > veyq-server-manifest.json <<'PY'
           import datetime, json, sys
-          release, commit, tree = sys.argv[1:4]
-          print(json.dumps({"release": release, "commit": commit, "tree_sha256": tree,
+          release, commit, tree, systems = sys.argv[1:5]
+          print(json.dumps({"release": release, "commit": commit, "tree_sha256": tree, "systems": json.loads(systems),
                             "date": datetime.date.today().isoformat()}, indent=2))
           PY
           cosign sign-blob --yes --bundle veyq-server-manifest.json.bundle veyq-server-manifest.json

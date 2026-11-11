@@ -3,6 +3,19 @@
     name: nftables
     state: present
 
+# Ubuntu ships ufw (inactive by default). Once enabled, its own input chains would drop beside this table what this
+# table lets in (80, 443, the host-only NodePorts), and a later `ufw enable` would do it silently: this role owns the
+# host firewall, so ufw is stopped and kept off wherever it is installed.
+- name: Read the installed services
+  ansible.builtin.service_facts:
+
+- name: Keep ufw off; this table is the host firewall
+  ansible.builtin.systemd_service:
+    name: ufw
+    enabled: false
+    state: stopped
+  when: "'ufw.service' in ansible_facts.services"
+
 - name: Write the host firewall
   ansible.builtin.template:
     src: nftables.conf.j2

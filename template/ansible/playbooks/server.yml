@@ -6,11 +6,11 @@
   connection: local
   gather_facts: false
   tasks:
-    - name: Require an Ansible that supports Debian 13's Python 3.13
+    - name: Require an Ansible that supports the servers' Python (3.13 on Debian 13, 3.12 on Ubuntu 24.04)
       ansible.builtin.assert:
         that: ansible_version.full is version('2.18', '>=')
         fail_msg: >-
-          ansible-core {{ ansible_version.full }} is too old for Debian 13 (Python 3.13); use 2.18 or later
+          ansible-core {{ ansible_version.full }} is too old for the server's Python; use 2.18 or later
           (README, Tools).
 
 - name: Harden the server and install k3s and Argo CD

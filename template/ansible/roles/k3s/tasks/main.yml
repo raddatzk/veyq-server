@@ -96,7 +96,7 @@
     mode: "0600"
 
 # k3s's built-in kubectl reads /etc/rancher/k3s/k3s.yaml (root only) unless KUBECONFIG says otherwise; it does
-# not fall back to ~/.kube/config. First line of .bashrc, before Debian's "not interactive: return".
+# not fall back to ~/.kube/config. First line of .bashrc, before the distribution's "not interactive: return".
 - name: Point the admin user's kubectl at that kubeconfig
   ansible.builtin.lineinfile:
     path: "/home/{{ admin_user }}/.bashrc"

@@ -1,7 +1,7 @@
 #!/usr/sbin/nft -f
 # Managed by Ansible (veyq-server, role firewall).
 #
-# NEVER `flush ruleset` in this file (Debian's default does): k3s keeps its own tables in the same nftables
+# NEVER `flush ruleset` in this file (Debian's and Ubuntu's default does): k3s keeps its own tables in the same nftables
 # (kube-proxy, flannel, the network-policy controller), and a flush would cut every pod off until k3s restarts.
 # This file owns one table and replaces only that one.
 #
@@ -26,8 +26,8 @@ table inet veyq_server {
 
     # ICMP and ICMPv6 (path MTU discovery, IPv6 neighbour discovery and router advertisements).
     meta l4proto { icmp, ipv6-icmp } accept
-    # DHCP replies: cloud Debian images commonly run dhcpcd for IPv4 AND IPv6 (port 546 seen listening on
-    # 2026-11-05). A reply to a multicast solicit matches no conntrack entry, so both are allowed explicitly; dropping
+    # DHCP replies: cloud images commonly run a DHCP client for IPv4 AND IPv6 (Debian's dhcpcd, port 546 seen listening
+    # on 2026-11-05; Ubuntu's systemd-networkd). A reply to a multicast solicit matches no conntrack entry, so both are allowed explicitly; dropping
     # them would lose the address at the next renewal.
     udp sport 67 udp dport 68 accept
     ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
