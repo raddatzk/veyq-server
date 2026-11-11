@@ -13,8 +13,8 @@ bootstrap, and then writes veyq's own half beside it (veyq ADR 0126). The Run ar
 ## The server it needs
 
 A freshly installed **Debian 13 (trixie)** or **Ubuntu 24.04 or 26.04 LTS (noble, resolute)** server — the platforms every role's
-`meta/main.yml` names (`scripts/systems.py` reads them; a release's signed manifest carries them as `systems`, and
-`veyqctl init` checks the server's `/etc/os-release` against them before the bootstrap) — reachable as **root** over
+`meta/main.yml` names (`scripts/systems.py` reads them, and a release's signed manifest carries them as `systems`;
+`veyqctl init` checks the server's `/etc/os-release` against what the rendered roles name, before the bootstrap) — reachable as **root** over
 SSH with your key. Most providers' images allow that (Hetzner's do); a stock Ubuntu cloud image does not (it logs in
 as `ubuntu`): put your key into root's `authorized_keys` first. 8 GB of memory (4 GB is tight); the provider's firewall
 open for TCP 22, 80 and 443 only. On Ubuntu, `ufw` is switched off: the template's nftables table is the host
