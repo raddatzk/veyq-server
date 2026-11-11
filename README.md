@@ -10,6 +10,13 @@ template into your repository with [Copier](https://copier.readthedocs.io/) — 
 verifies first, never from a branch: the template runs Ansible as root on your server — generates its secrets, runs the
 bootstrap, and then writes veyq's own half beside it (veyq ADR 0126). The Run area of veyq's docs says how.
 
+## The server it needs
+
+A freshly installed **Debian 13 (trixie)** server — the platform every role's `meta/main.yml` names, and the only one
+the playbooks are written for — reachable as root over SSH with your key. 8 GB of memory (4 GB is tight); the
+provider's firewall open for TCP 22, 80 and 443 only. Anything else (another distribution, another release) is not
+supported until a role says so.
+
 ## What is here
 
 | Path | What it is |
